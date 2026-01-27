@@ -1,0 +1,326 @@
+generator client {
+  // provider   = "prisma-client"
+  provider = "prisma-client-js"            // Rust-free + driver adapter
+}
+
+datasource db {
+  provider = "postgresql"
+  // url     = env("DATABASE_URL")  // si tu utilises encore le datasource URL
+}
+
+model User {
+  id            String        @id @default(cuid())
+  email         String        @unique @db.VarChar(255)
+  username      String        @unique @db.VarChar(100)
+  password      String        @db.VarChar(255)
+  firstName     String?       @db.VarChar(100)
+  lastName      String?       @db.VarChar(100)
+  avatar        String?       @db.VarChar(500)
+  bio           String?       @db.Text
+  role          Role          @default(STUDENT)
+  isActive      Boolean       @default(true)
+  emailVerified Boolean       @default(false)
+  lastLogin     DateTime?
+  
+  // Social logins
+  githubId      String?       @unique
+  googleId      String?       @unique
+  
+  // Timestamps
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  
+  // Relations
+  coursesTaught Course[]      @relation("InstructorCourses")
+  enrollments   Enrollment[]
+  progress      Progress[]
+  submissions   Submission[]
+  comments      Comment[]
+  notifications Notification[]
+  refreshTokens RefreshToken[]
+  
+  @@map("users")
+}
+
+model RefreshToken {
+  id           String   @id @default(cuid())
+  token        String   @unique @db.VarChar(500)
+  userId       String
+  expiresAt    DateTime
+  revoked      Boolean  @default(false)
+  replacedBy   String?  @db.VarChar(500)
+  createdAt    DateTime @default(now())
+  
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("refresh_tokens")
+}
+
+model Course {
+  id            String        @id @default(cuid())
+  title         String        @db.VarChar(200)
+  slug          String        @unique @db.VarChar(255)
+  description   String        @db.Text
+  shortDescription String?     @db.VarChar(500)
+  thumbnail     String?       @db.VarChar(500)
+  difficulty    Difficulty    @default(BEGINNER)
+  duration      Int           @default(0) // en minutes
+  isPublished   Boolean       @default(false)
+  isFeatured    Boolean       @default(false)
+  publishedAt   DateTime?
+  instructorId  String
+  
+  // Metadata
+  order         Int           @default(0)
+  rating        Float         @default(0)
+  totalStudents Int           @default(0)
+  totalLessons  Int           @default(0)
+  
+  // Timestamps
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  
+  // Relations
+  instructor    User          @relation("InstructorCourses", fields: [instructorId], references: [id], onDelete: Cascade)
+  modules       Module[]
+  tags          CourseTag[]
+  enrollments   Enrollment[]
+  
+  @@map("courses")
+}
+
+model CourseTag {
+  id        String   @id @default(cuid())
+  name      String   @db.VarChar(50)
+  courseId  String
+  
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  
+  @@unique([name, courseId])
+  @@map("course_tags")
+}
+
+model Module {
+  id          String    @id @default(cuid())
+  title       String    @db.VarChar(200)
+  description String?   @db.Text
+  order       Int       @default(0)
+  duration    Int       @default(0) // en minutes
+  courseId    String
+  
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relations
+  course      Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons     Lesson[]
+  
+  @@map("modules")
+}
+
+model Lesson {
+  id          String    @id @default(cuid())
+  title       String    @db.VarChar(200)
+  slug        String    @unique @db.VarChar(255)
+  content     String    @db.Text // Markdown
+  videoUrl    String?   @db.VarChar(500)
+  videoType   VideoType?
+  duration    Int       @default(0) // en minutes
+  order       Int       @default(0)
+  isFree      Boolean   @default(false)
+  moduleId    String
+  
+  // Metadata
+  views       Int       @default(0)
+  
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relations
+  module      Module    @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  progress    Progress[]
+  comments    Comment[]
+  exercise    Exercise?
+  
+  @@map("lessons")
+}
+
+model Exercise {
+  id            String      @id @default(cuid())
+  title         String      @db.VarChar(200)
+  instructions  String      @db.Text
+  starterCode   String      @db.Text
+  solution      String      @db.Text
+  tests         String      @db.Text // Tests unitaires au format JSON ou code
+  language      Language    @default(JAVASCRIPT)
+  difficulty    Difficulty  @default(BEGINNER)
+  hints         String[]    // Tableau de hints
+  timeLimit     Int         @default(30) // en secondes
+  memoryLimit   Int         @default(128) // en MB
+  lessonId      String      @unique
+  
+  // Metadata
+  points        Int         @default(10)
+  
+  // Timestamps
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  // Relations
+  lesson        Lesson      @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  submissions   Submission[]
+  
+  @@map("exercises")
+}
+
+model Submission {
+  id            String    @id @default(cuid())
+  code          String    @db.Text
+  language      Language  @default(JAVASCRIPT)
+  status        SubmissionStatus @default(PENDING)
+  result        Json?     // Résultats des tests
+  executionTime Int?      // en ms
+  memoryUsed    Int?      // en KB
+  passedTests   Int       @default(0)
+  totalTests    Int       @default(0)
+  userId        String
+  exerciseId    String
+  
+  // Timestamps
+  createdAt     DateTime  @default(now())
+  
+  // Relations
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exercise      Exercise  @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  
+  @@map("submissions")
+}
+
+model Enrollment {
+  id          String        @id @default(cuid())
+  userId      String
+  courseId    String
+  progress    Float         @default(0) // 0-100
+  completed   Boolean       @default(false)
+  completedAt DateTime?
+  
+  // Timestamps
+  enrolledAt  DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  
+  // Relations
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course      Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, courseId])
+  @@map("enrollments")
+}
+
+model Progress {
+  id          String    @id @default(cuid())
+  userId      String
+  lessonId    String
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+  timeSpent   Int       @default(0) // en secondes
+  lastPosition Int?     // Position dans la vidéo (en secondes)
+  
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relations
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson      Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, lessonId])
+  @@map("progress")
+}
+
+model Comment {
+  id          String    @id @default(cuid())
+  content     String    @db.Text
+  userId      String
+  lessonId    String
+  parentId    String?
+  isEdited    Boolean   @default(false)
+  
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relations
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson      Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  parent      Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies     Comment[] @relation("CommentReplies")
+  
+  @@map("comments")
+}
+
+model Notification {
+  id          String         @id @default(cuid())
+  type        NotificationType @default(SYSTEM)
+  title       String         @db.VarChar(200)
+  message     String         @db.Text
+  userId      String
+  isRead      Boolean        @default(false)
+  metadata    Json?
+  
+  // Timestamps
+  createdAt   DateTime       @default(now())
+  readAt      DateTime?
+  
+  // Relations
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("notifications")
+}
+
+// Enums
+enum Role {
+  STUDENT
+  INSTRUCTOR
+  ADMIN
+}
+
+enum Difficulty {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum Language {
+  JAVASCRIPT
+  TYPESCRIPT
+  PYTHON
+  HTML
+  CSS
+  JAVA
+  CPP
+}
+
+enum VideoType {
+  YOUTUBE
+  VIMEO
+  UPLOADED
+}
+
+enum SubmissionStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+  TIMEOUT
+  ERROR
+}
+
+enum NotificationType {
+  SYSTEM
+  COURSE
+  EXERCISE
+  COMMENT
+  ACHIEVEMENT
+}
