@@ -45,22 +45,22 @@ export class ExerciseService {
     createExerciseDto: CreateExerciseDto,
     userId: string,
   ): Promise<Exercise> {
-    // Vérifier que l'utilisateur est un instructeur ou admin
+    // Verify that user is an instructor or admin
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
 
     if (!user) {
-      throw new NotFoundException('Utilisateur non trouvé');
+      throw new NotFoundException('User not found');
     }
 
     if (user.role !== Role.INSTRUCTOR && user.role !== Role.ADMIN) {
       throw new ForbiddenException(
-        'Seuls les instructeurs et administrateurs peuvent créer des exercices',
+        'Only instructors and administrators can create exercises',
       );
     }
 
-    // Vérifier que la leçon existe
+    // Verify that lesson exists
     const lesson = await this.prisma.lesson.findUnique({
       where: { id: createExerciseDto.lessonId },
       include: {
@@ -73,29 +73,31 @@ export class ExerciseService {
     });
 
     if (!lesson) {
-      throw new NotFoundException('Leçon non trouvée');
+      throw new NotFoundException('Lesson not found');
     }
 
-    // Vérifier que l'utilisateur est l'instructeur du cours
+    // Verify that user is the course instructor
     if (
       lesson.module.course.instructorId !== userId &&
       user.role !== Role.ADMIN
     ) {
       throw new ForbiddenException(
-        'Vous ne pouvez créer des exercices que pour vos propres cours',
+        'You can only create exercises for your own courses',
       );
     }
 
-    // Vérifier qu'il n'y a pas déjà un exercice pour cette leçon
+    // Check if an exercise already exists for this lesson
     const existingExercise = await this.prisma.exercise.findUnique({
       where: { lessonId: createExerciseDto.lessonId },
     });
 
     if (existingExercise) {
-      throw new BadRequestException('Cette leçon a déjà un exercice associé');
+      throw new BadRequestException(
+        'This lesson already has an associated exercise',
+      );
     }
 
-    // Créer l'exercice
+    // Create exercise
     return this.prisma.exercise.create({
       data: {
         title: createExerciseDto.title,
@@ -163,16 +165,16 @@ export class ExerciseService {
     });
 
     if (!exercise) {
-      throw new NotFoundException('Exercice non trouvé');
+      throw new NotFoundException('Exercise not found');
     }
 
-    // Vérifier les permissions
+    // Check permissions
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
 
     if (!user) {
-      throw new NotFoundException('Utilisateur non trouvé');
+      throw new NotFoundException('User not found');
     }
 
     const isInstructor = exercise.lesson.module.course.instructorId === userId;
@@ -184,15 +186,15 @@ export class ExerciseService {
 
     if (!isInstructor && !isAdmin && !isEnrolled) {
       throw new ForbiddenException(
-        'Vous devez être inscrit au cours pour accéder à cet exercice',
+        'You must be enrolled in the course to access this exercise',
       );
     }
 
-    // Masquer la solution et certains tests pour les étudiants
+    // Hide solution and some tests for students
     if (!isInstructor && !isAdmin) {
       delete exercise.solution;
-      // Ne pas renvoyer les tests complets pour les étudiants
-      exercise.tests = "// Tests masqués pour l'étudiant";
+      // Do not return full tests for students
+      exercise.tests = '// Tests hidden for students';
     }
 
     return exercise;
@@ -219,21 +221,21 @@ export class ExerciseService {
     });
 
     if (!exercise) {
-      throw new NotFoundException('Exercice non trouvé');
+      throw new NotFoundException('Exercise not found');
     }
 
-    // Vérifier que l'utilisateur est inscrit au cours
+    // Check if user is enrolled in the course
     const isEnrolled = await this.isUserEnrolled(
       userId,
       exercise.lesson.module.course.id,
     );
     if (!isEnrolled) {
       throw new ForbiddenException(
-        'Vous devez être inscrit au cours pour soumettre une solution',
+        'You must be enrolled in the course to submit a solution',
       );
     }
 
-    // Créer une soumission avec statut PENDING
+    // Create submission with PENDING status
     const submission = await this.prisma.submission.create({
       data: {
         code: submitDto.code,
@@ -245,10 +247,10 @@ export class ExerciseService {
     });
 
     try {
-      // Exécuter le code en arrière-plan
+      // Execute code in background
       void this.processSubmission(submission, exercise, submitDto.customInput);
     } catch (error: unknown) {
-      // Mettre à jour le statut en cas d'erreur
+      // Update status on error
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       await this.prisma.submission.update({
@@ -269,16 +271,16 @@ export class ExerciseService {
     customInput?: string,
   ): Promise<void> {
     try {
-      // Mettre à jour le statut à RUNNING
+      // Update status to RUNNING
       await this.prisma.submission.update({
         where: { id: submission.id },
         data: { status: SubmissionStatus.RUNNING },
       });
 
-      // Préparer les tests
+      // Prepare tests
       let testSuite = exercise.tests;
       if (customInput) {
-        // Ajouter un test personnalisé
+        // Add custom test
         testSuite = this.addCustomTest(
           testSuite,
           customInput,
@@ -286,7 +288,7 @@ export class ExerciseService {
         );
       }
 
-      // Exécuter le code
+      // Execute code
       const result: ExecutionResult =
         await this.codeExecutionService.executeCode(
           submission.code,
@@ -296,12 +298,12 @@ export class ExerciseService {
           exercise.memoryLimit,
         );
 
-      // Déterminer le statut final
+      // Determine final status
       const status: SubmissionStatus = result.passed
         ? SubmissionStatus.SUCCESS
         : SubmissionStatus.FAILED;
 
-      // Convertir ExecutionResult en format JSON sérialisable
+      // Convert ExecutionResult to serializable JSON format
       const resultJson = {
         output: result.output,
         error: result.error,
@@ -315,7 +317,7 @@ export class ExerciseService {
         })),
       };
 
-      // Mettre à jour la soumission
+      // Update submission
       await this.prisma.submission.update({
         where: { id: submission.id },
         data: {
@@ -328,7 +330,7 @@ export class ExerciseService {
         },
       });
 
-      // Si c'est la première soumission réussie, marquer la leçon comme terminée
+      // If it's the first successful submission, mark lesson as completed
       if (status === SubmissionStatus.SUCCESS) {
         await this.markLessonAsCompleted(submission.userId, exercise.lesson.id);
       }
@@ -356,7 +358,7 @@ export class ExerciseService {
         return `
               ${testSuite}
               
-              // Test personnalisé
+              // Custom test
               try {
                 const userResult = eval(\`${customInput}\`);
                 console.log('Custom test result:', userResult);
@@ -368,7 +370,7 @@ export class ExerciseService {
         return `
               ${testSuite}
               
-              # Test personnalisé
+              # Custom test
               try:
                 user_result = eval("""${customInput}""")
                 print(f'Custom test result: {user_result}')
@@ -384,7 +386,7 @@ export class ExerciseService {
     userId: string,
     lessonId: string,
   ): Promise<void> {
-    // Vérifier si la progression existe déjà
+    // Check if progress already exists
     const existingProgress = await this.prisma.progress.findUnique({
       where: {
         userId_lessonId: { userId, lessonId },
@@ -455,7 +457,7 @@ export class ExerciseService {
     exerciseId: string,
     limit: number = 20,
   ): Promise<unknown[]> {
-    // Récupérer les meilleures soumissions par utilisateur
+    // Get best submissions per user
     const bestSubmissions = await this.prisma.$queryRaw`
           SELECT DISTINCT ON (s."userId") 
             s.*,
@@ -479,7 +481,7 @@ export class ExerciseService {
     code: string,
     language: Language,
   ): Promise<ExecutionResult> {
-    // Récupérer l'exercice
+    // Get exercise
     const exercise = await this.prisma.exercise.findUnique({
       where: { id: exerciseId },
       include: {
@@ -496,16 +498,16 @@ export class ExerciseService {
     });
 
     if (!exercise) {
-      throw new NotFoundException('Exercice non trouvé');
+      throw new NotFoundException('Exercise not found');
     }
 
-    // Vérifier les permissions
+    // Check permissions
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
 
     if (!user) {
-      throw new NotFoundException('Utilisateur non trouvé');
+      throw new NotFoundException('User not found');
     }
 
     const isInstructor = exercise.lesson.module.course.instructorId === userId;
@@ -513,18 +515,18 @@ export class ExerciseService {
 
     if (!isInstructor && !isAdmin) {
       throw new ForbiddenException(
-        'Seuls les instructeurs ou administrateurs peuvent tester un exercice',
+        'Only instructors or administrators can test an exercise',
       );
     }
 
-    // Vérifier la langue
+    // Verify language
     if (language !== exercise.language) {
       throw new BadRequestException(
-        `Langage invalide. Langage attendu : ${exercise.language}`,
+        `Invalid language. Expected language: ${exercise.language}`,
       );
     }
 
-    // Exécuter le code via CodeExecutionService
+    // Execute code via CodeExecutionService
     return this.codeExecutionService.executeCode(
       code,
       language,
@@ -555,25 +557,23 @@ export class ExerciseService {
     });
 
     if (!exercise) {
-      throw new NotFoundException('Exercice non trouvé');
+      throw new NotFoundException('Exercise not found');
     }
 
-    // Vérifier les permissions
+    // Check permissions
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
 
     if (!user) {
-      throw new NotFoundException('Utilisateur non trouvé');
+      throw new NotFoundException('User not found');
     }
 
     if (
       exercise.lesson.module.course.instructorId !== userId &&
       user.role !== Role.ADMIN
     ) {
-      throw new ForbiddenException(
-        'Vous ne pouvez modifier que vos propres exercices',
-      );
+      throw new ForbiddenException('You can only modify your own exercises');
     }
 
     return this.prisma.exercise.update({
@@ -613,25 +613,23 @@ export class ExerciseService {
     });
 
     if (!exercise) {
-      throw new NotFoundException('Exercice non trouvé');
+      throw new NotFoundException('Exercise not found');
     }
 
-    // Vérifier les permissions
+    // Check permissions
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
 
     if (!user) {
-      throw new NotFoundException('Utilisateur non trouvé');
+      throw new NotFoundException('User not found');
     }
 
     if (
       exercise.lesson.module.course.instructorId !== userId &&
       user.role !== Role.ADMIN
     ) {
-      throw new ForbiddenException(
-        'Vous ne pouvez supprimer que vos propres exercices',
-      );
+      throw new ForbiddenException('You can only delete your own exercises');
     }
 
     await this.prisma.exercise.delete({

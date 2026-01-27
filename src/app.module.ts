@@ -9,6 +9,8 @@ import { LessonModule } from './lesson/lesson.module';
 import { ModuleModule } from './module/module.module';
 import { ProgressModule } from './progress/progress.module';
 import { ExercisesModule } from './exercise/exercise.module';
+import { CommentModule } from './comment/comment.module';
+import { NotificationModule } from './notification/notification.module';
 import jwtConfig from './config/jwt.config';
 
 @Module({
@@ -25,6 +27,8 @@ import jwtConfig from './config/jwt.config';
     ModuleModule,
     ProgressModule,
     ExercisesModule,
+    CommentModule,
+    NotificationModule,
   ],
   providers: [
     {

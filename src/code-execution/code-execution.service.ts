@@ -76,7 +76,7 @@ export class CodeExecutionService {
     let container: any = null;
 
     try {
-      // Créer le conteneur
+      // Create the container
       container = await this.docker.createContainer({
         ...containerConfig,
         name: `exec-${containerId}`,
@@ -85,7 +85,7 @@ export class CodeExecutionService {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await container.start();
 
-      // Attendre la fin de l'exécution avec timeout
+      // Wait for execution to finish with timeout
       const timeout = (timeLimit + 5) * 1000; // +5 seconds buffer
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const waitPromise = container.wait();
@@ -95,7 +95,7 @@ export class CodeExecutionService {
 
       await Promise.race([waitPromise, timeoutPromise]);
 
-      // Récupérer les logs
+      // Retrieve logs
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const logs = await container.logs({
         stdout: true,
@@ -103,12 +103,12 @@ export class CodeExecutionService {
         follow: false,
       });
 
-      // Convertir les logs en string
+      // Convert logs to string
       const logsOutput = Buffer.isBuffer(logs)
         ? logs.toString('utf8')
         : String(logs);
 
-      // Récupérer les stats
+      // Retrieve stats
       const statsData = await this.getContainerStats(container);
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
@@ -116,7 +116,7 @@ export class CodeExecutionService {
 
       const outputTrimmed = logsOutput.trim();
 
-      // Analyser la sortie pour déterminer si les tests ont réussi
+      // Analyze output to determine if tests passed
       const passed = this.evaluateTestOutput(outputTrimmed);
       const testResults = this.parseTestResults(outputTrimmed);
 
@@ -129,7 +129,7 @@ export class CodeExecutionService {
         testResults,
       };
     } catch (error: unknown) {
-      // Nettoyer le conteneur en cas d'erreur
+      // Clean up container on error
       if (container) {
         try {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
@@ -234,11 +234,11 @@ export class CodeExecutionService {
     return `
           ${code}
           
-          // Exécuter les tests
+          // Execute tests
           try {
             ${testSuite}
             
-            // Si on arrive ici, tous les tests ont réussi
+            // If we reach this point, all tests passed
             console.log('{"status": "SUCCESS", "passed": true}');
           } catch (error) {
             const err = error instanceof Error ? error.message : String(error);
@@ -248,7 +248,7 @@ export class CodeExecutionService {
   }
 
   private wrapTypeScriptCode(code: string, testSuite: string): string {
-    // Pour TypeScript, nous exécutons directement avec ts-node
+    // For TypeScript, we execute directly with ts-node
     return this.wrapJavaScriptCode(code, testSuite);
   }
 
@@ -294,7 +294,7 @@ export class CodeExecutionService {
   }
 
   private wrapHtmlCode(code: string, testSuite: string): string {
-    // Pour HTML, on vérifie la structure
+    // For HTML, we verify the structure
     return `
           const html = \`${code.replace(/`/g, '\\`')}\`;
           ${testSuite}
@@ -303,7 +303,7 @@ export class CodeExecutionService {
   }
 
   private wrapCssCode(code: string, testSuite: string): string {
-    // Pour CSS, on vérifie les règles
+    // For CSS, we verify the rules
     return `
           const css = \`${code.replace(/`/g, '\\`')}\`;
           ${testSuite}
@@ -354,7 +354,7 @@ export class CodeExecutionService {
         return result.testResults ?? [];
       }
     } catch {
-      // Ignorer les erreurs de parsing
+      // Ignore parsing errors
     }
     return [];
   }
@@ -393,6 +393,6 @@ export class CodeExecutionService {
       return 0;
     }
 
-    return Math.round(usage / 1024); // Convertir bytes en KB
+    return Math.round(usage / 1024); // Convert bytes to KB
   }
 }

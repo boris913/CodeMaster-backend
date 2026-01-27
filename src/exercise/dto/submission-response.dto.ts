@@ -3,42 +3,42 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Submission, SubmissionStatus, Language } from '@prisma/client';
 
 export class SubmissionResponseDto implements Partial<Submission> {
-  @ApiProperty({ description: 'ID de la soumission' })
+  @ApiProperty({ description: 'Submission ID' })
   id: string;
 
-  @ApiProperty({ description: 'Code soumis' })
+  @ApiProperty({ description: 'Submitted code' })
   code: string;
 
-  @ApiProperty({ enum: Language, description: 'Langage utilisé' })
+  @ApiProperty({ enum: Language, description: 'Language used' })
   language: Language;
 
   @ApiProperty({
     enum: SubmissionStatus,
-    description: 'Statut de la soumission',
+    description: 'Submission status',
   })
   status: SubmissionStatus;
 
-  @ApiProperty({ description: 'Résultats des tests (JSON)' })
+  @ApiProperty({ description: 'Test results (JSON)' })
   result: any;
 
-  @ApiProperty({ description: "Temps d'exécution en ms" })
+  @ApiProperty({ description: 'Execution time in ms' })
   executionTime: number;
 
-  @ApiProperty({ description: 'Mémoire utilisée en KB' })
+  @ApiProperty({ description: 'Memory used in KB' })
   memoryUsed: number;
 
-  @ApiProperty({ description: 'Tests réussis' })
+  @ApiProperty({ description: 'Passed tests count' })
   passedTests: number;
 
-  @ApiProperty({ description: 'Nombre total de tests' })
+  @ApiProperty({ description: 'Total number of tests' })
   totalTests: number;
 
-  @ApiProperty({ description: "ID de l'utilisateur" })
+  @ApiProperty({ description: 'User ID' })
   userId: string;
 
-  @ApiProperty({ description: "ID de l'exercice" })
+  @ApiProperty({ description: 'Exercise ID' })
   exerciseId: string;
 
-  @ApiProperty({ description: 'Date de création' })
+  @ApiProperty({ description: 'Creation date' })
   createdAt: Date;
 }

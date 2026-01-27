@@ -4,16 +4,16 @@ import { Language } from '@prisma/client';
 import { IsString, IsEnum, IsOptional } from 'class-validator';
 
 export class SubmitExerciseDto {
-  @ApiProperty({ description: "Code soumis par l'utilisateur" })
+  @ApiProperty({ description: 'Code submitted by the user' })
   @IsString()
   code: string;
 
-  @ApiProperty({ enum: Language, description: 'Langage utilisé' })
+  @ApiProperty({ enum: Language, description: 'Language used' })
   @IsEnum(Language)
   language: Language;
 
   @ApiProperty({
-    description: 'Input personnalisé (optionnel)',
+    description: 'Custom input (optional)',
     required: false,
   })
   @IsString()

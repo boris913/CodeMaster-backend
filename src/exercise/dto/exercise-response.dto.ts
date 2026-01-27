@@ -3,42 +3,42 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Exercise, Language, Difficulty } from '@prisma/client';
 
 export class ExerciseResponseDto implements Partial<Exercise> {
-  @ApiProperty({ description: "ID de l'exercice" })
+  @ApiProperty({ description: 'Exercise ID' })
   id: string;
 
-  @ApiProperty({ description: "Titre de l'exercice" })
+  @ApiProperty({ description: 'Exercise title' })
   title: string;
 
-  @ApiProperty({ description: "Instructions de l'exercice" })
+  @ApiProperty({ description: 'Exercise instructions' })
   instructions: string;
 
-  @ApiProperty({ description: 'Code de départ' })
+  @ApiProperty({ description: 'Starter code' })
   starterCode: string;
 
-  @ApiProperty({ description: 'Langage de programmation' })
+  @ApiProperty({ description: 'Programming language' })
   language: Language;
 
-  @ApiProperty({ enum: Difficulty, description: 'Difficulté' })
+  @ApiProperty({ enum: Difficulty, description: 'Difficulty level' })
   difficulty: Difficulty;
 
-  @ApiProperty({ type: [String], description: 'Indices' })
+  @ApiProperty({ type: [String], description: 'Hints' })
   hints: string[];
 
-  @ApiProperty({ description: 'Limite de temps en secondes' })
+  @ApiProperty({ description: 'Time limit in seconds' })
   timeLimit: number;
 
-  @ApiProperty({ description: 'Limite de mémoire en MB' })
+  @ApiProperty({ description: 'Memory limit in MB' })
   memoryLimit: number;
 
-  @ApiProperty({ description: 'Points pour la réussite' })
+  @ApiProperty({ description: 'Points awarded for success' })
   points: number;
 
-  @ApiProperty({ description: 'ID de la leçon associée' })
+  @ApiProperty({ description: 'Associated lesson ID' })
   lessonId: string;
 
-  @ApiProperty({ description: 'Date de création' })
+  @ApiProperty({ description: 'Creation date' })
   createdAt: Date;
 
-  @ApiProperty({ description: 'Date de mise à jour' })
+  @ApiProperty({ description: 'Update date' })
   updatedAt: Date;
 }

@@ -5,27 +5,27 @@ import { PartialType } from '@nestjs/swagger';
 import { CreateExerciseDto } from './create-exercise.dto';
 
 export class UpdateExerciseDto extends PartialType(CreateExerciseDto) {
-  @ApiProperty({ description: "Titre de l'exercice", required: false })
+  @ApiProperty({ description: 'Exercise title', required: false })
   @IsString()
   @IsOptional()
   title?: string;
 
-  @ApiProperty({ description: "Instructions de l'exercice", required: false })
+  @ApiProperty({ description: 'Exercise instructions', required: false })
   @IsString()
   @IsOptional()
   instructions?: string;
 
-  @ApiProperty({ description: 'Code de départ', required: false })
+  @ApiProperty({ description: 'Starter code', required: false })
   @IsString()
   @IsOptional()
   starterCode?: string;
 
-  @ApiProperty({ description: 'Solution de référence', required: false })
+  @ApiProperty({ description: 'Reference solution', required: false })
   @IsString()
   @IsOptional()
   solution?: string;
 
-  @ApiProperty({ description: 'Tests unitaires', required: false })
+  @ApiProperty({ description: 'Unit tests', required: false })
   @IsString()
   @IsOptional()
   tests?: string;

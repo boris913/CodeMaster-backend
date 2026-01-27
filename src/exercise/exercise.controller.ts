@@ -56,22 +56,21 @@ export class ExerciseController {
   @Roles(Role.INSTRUCTOR, Role.ADMIN)
   @ApiBearerAuth('access-token')
   @ApiOperation({
-    summary: 'Créer un nouvel exercice',
-    description:
-      'Créer un exercice de programmation (instructeurs/admins uniquement)',
+    summary: 'Create a new exercise',
+    description: 'Create a programming exercise (instructors/admins only)',
   })
   @ApiResponse({
     status: HttpStatus.CREATED,
-    description: 'Exercice créé avec succès',
+    description: 'Exercise created successfully',
     type: ExerciseResponseDto,
   })
   @ApiResponse({
     status: HttpStatus.FORBIDDEN,
-    description: 'Accès non autorisé',
+    description: 'Access denied',
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
-    description: 'Leçon non trouvée',
+    description: 'Lesson not found',
   })
   async create(
     @Body() createExerciseDto: CreateExerciseDto,
@@ -84,21 +83,21 @@ export class ExerciseController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('access-token')
   @ApiOperation({
-    summary: 'Récupérer un exercice par ID',
-    description: "Récupère les détails d'un exercice",
+    summary: 'Retrieve an exercise by ID',
+    description: 'Gets exercise details',
   })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'Exercice récupéré avec succès',
+    description: 'Exercise retrieved successfully',
     type: ExerciseResponseDto,
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
-    description: 'Exercice non trouvé',
+    description: 'Exercise not found',
   })
   @ApiResponse({
     status: HttpStatus.FORBIDDEN,
-    description: 'Non inscrit au cours',
+    description: 'Not enrolled in course',
   })
   async findOne(
     @Param('id') id: string,
@@ -111,21 +110,21 @@ export class ExerciseController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('access-token')
   @ApiOperation({
-    summary: 'Soumettre une solution',
-    description: 'Soumettre une solution à un exercice',
+    summary: 'Submit a solution',
+    description: 'Submit a solution for an exercise',
   })
   @ApiResponse({
     status: HttpStatus.CREATED,
-    description: 'Solution soumise avec succès',
+    description: 'Solution submitted successfully',
     type: SubmissionResponseDto,
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
-    description: 'Exercice non trouvé',
+    description: 'Exercise not found',
   })
   @ApiResponse({
     status: HttpStatus.FORBIDDEN,
-    description: 'Non inscrit au cours',
+    description: 'Not enrolled in course',
   })
   async submit(
     @Param('id') id: string,
@@ -139,24 +138,24 @@ export class ExerciseController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('access-token')
   @ApiOperation({
-    summary: "Récupérer les soumissions d'un utilisateur",
-    description: "Récupère l'historique des soumissions pour un exercice",
+    summary: 'Retrieve user submissions',
+    description: 'Gets submission history for an exercise',
   })
   @ApiQuery({
     name: 'page',
     required: false,
     type: Number,
-    description: 'Numéro de page (défaut: 1)',
+    description: 'Page number (default: 1)',
   })
   @ApiQuery({
     name: 'limit',
     required: false,
     type: Number,
-    description: 'Éléments par page (défaut: 10)',
+    description: 'Items per page (default: 10)',
   })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'Soumissions récupérées avec succès',
+    description: 'Submissions retrieved successfully',
   })
   async getSubmissions(
     @Param('id') id: string,
@@ -171,18 +170,18 @@ export class ExerciseController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('access-token')
   @ApiOperation({
-    summary: 'Récupérer le classement',
-    description: 'Récupère le classement des meilleures soumissions',
+    summary: 'Retrieve leaderboard',
+    description: 'Gets the leaderboard of top submissions',
   })
   @ApiQuery({
     name: 'limit',
     required: false,
     type: Number,
-    description: "Nombre d'entrées (défaut: 20)",
+    description: 'Number of entries (default: 20)',
   })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'Classement récupéré avec succès',
+    description: 'Leaderboard retrieved successfully',
   })
   async getLeaderboard(
     @Param('id') id: string,
@@ -196,21 +195,21 @@ export class ExerciseController {
   @Roles(Role.INSTRUCTOR, Role.ADMIN)
   @ApiBearerAuth('access-token')
   @ApiOperation({
-    summary: 'Mettre à jour un exercice',
-    description: 'Met à jour un exercice existant',
+    summary: 'Update an exercise',
+    description: 'Updates an existing exercise',
   })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'Exercice mis à jour avec succès',
+    description: 'Exercise updated successfully',
     type: ExerciseResponseDto,
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
-    description: 'Exercice non trouvé',
+    description: 'Exercise not found',
   })
   @ApiResponse({
     status: HttpStatus.FORBIDDEN,
-    description: 'Accès non autorisé',
+    description: 'Access denied',
   })
   async update(
     @Param('id') id: string,
@@ -226,20 +225,20 @@ export class ExerciseController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiBearerAuth('access-token')
   @ApiOperation({
-    summary: 'Supprimer un exercice',
-    description: 'Supprime un exercice existant',
+    summary: 'Delete an exercise',
+    description: 'Deletes an existing exercise',
   })
   @ApiResponse({
     status: HttpStatus.NO_CONTENT,
-    description: 'Exercice supprimé avec succès',
+    description: 'Exercise deleted successfully',
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
-    description: 'Exercice non trouvé',
+    description: 'Exercise not found',
   })
   @ApiResponse({
     status: HttpStatus.FORBIDDEN,
-    description: 'Accès non autorisé',
+    description: 'Access denied',
   })
   async remove(
     @Param('id') id: string,
@@ -253,21 +252,21 @@ export class ExerciseController {
   @Roles(Role.INSTRUCTOR, Role.ADMIN)
   @ApiBearerAuth('access-token')
   @ApiOperation({
-    summary: 'Tester un exercice',
+    summary: 'Test an exercise',
     description:
-      'Exécute les tests sur un code donné (instructeurs et administrateurs uniquement)',
+      'Executes tests on a given code (instructors and administrators only)',
   })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'Tests exécutés avec succès',
+    description: 'Tests executed successfully',
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
-    description: 'Exercice non trouvé',
+    description: 'Exercise not found',
   })
   @ApiResponse({
     status: HttpStatus.FORBIDDEN,
-    description: 'Accès non autorisé',
+    description: 'Access denied',
   })
   async testExercise(
     @Param('id') id: string,
