@@ -74,7 +74,6 @@ interface LessonCompletedPayload {
 export class NotificationListener {
   constructor(private readonly notificationService: NotificationService) {}
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
   @OnEvent('comment.created')
   async handleCommentCreatedEvent(
     payload: CommentCreatedPayload,
@@ -93,7 +92,6 @@ export class NotificationListener {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
   @OnEvent('exercise.submitted')
   async handleExerciseSubmittedEvent(
     payload: ExerciseSubmittedPayload,
@@ -110,7 +108,6 @@ export class NotificationListener {
     );
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
   @OnEvent('course.enrolled')
   async handleCourseEnrolledEvent(
     payload: CourseEnrolledPayload,
@@ -127,7 +124,6 @@ export class NotificationListener {
     );
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
   @OnEvent('lesson.completed')
   async handleLessonCompletedEvent(
     payload: LessonCompletedPayload,

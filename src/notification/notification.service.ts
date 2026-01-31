@@ -50,7 +50,6 @@ export class NotificationService {
     });
 
     // Emit an event for WebSockets or other services
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     this.eventEmitter.emit('notification.created', {
       userId,
       notification,
@@ -84,7 +83,6 @@ export class NotificationService {
 
     // Emit an event for each user
     userIds.forEach((userId) => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       this.eventEmitter.emit('notification.created', {
         userId,
         notification: {

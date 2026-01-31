@@ -46,7 +46,7 @@ export class LessonService {
     }
 
     // Generate slug from title
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+
     const title: string = createLessonDto.title ?? '';
     if (!title) {
       throw new BadRequestException('Title is required');
@@ -72,14 +72,14 @@ export class LessonService {
 
     // Determine video type from URL
     let videoType: VideoType | null = null;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+
     const videoUrl: string | undefined = createLessonDto.videoUrl;
     if (videoUrl && typeof videoUrl === 'string') {
       videoType = this.detectVideoType(videoUrl);
     }
 
     // Create the lesson data explicitly with correct typing
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+
     const content: string = createLessonDto.content ?? '';
     if (!content) {
       throw new BadRequestException('Content is required');
@@ -90,19 +90,15 @@ export class LessonService {
       slug,
       content,
       videoUrl: videoUrl ?? null,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
       duration:
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         typeof createLessonDto.duration === 'number'
-          ? // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-            createLessonDto.duration
+          ? createLessonDto.duration
           : 0,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
       isFree:
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         typeof createLessonDto.isFree === 'boolean'
-          ? // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-            createLessonDto.isFree
+          ? createLessonDto.isFree
           : false,
       videoType,
       order,

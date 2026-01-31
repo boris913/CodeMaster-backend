@@ -1,42 +1,46 @@
 module.exports = {
-    parser: '@typescript-eslint/parser',
-    parserOptions: {
-      project: 'tsconfig.json',
-      tsconfigRootDir: __dirname,
-      sourceType: 'module',
-      allowDefaultProject: true, // Ajoutez cette ligne
-    },
-    plugins: ['@typescript-eslint/eslint-plugin'],
-    extends: [
-      'plugin:@typescript-eslint/recommended',
-      'plugin:prettier/recommended',
+  parser: '@typescript-eslint/parser',
+  parserOptions: {
+    project: 'tsconfig.json',
+    tsconfigRootDir: __dirname,
+    sourceType: 'module',
+    allowDefaultProject: true,
+  },
+  plugins: ['@typescript-eslint/eslint-plugin'],
+  extends: [
+    'plugin:@typescript-eslint/recommended',
+    'plugin:prettier/recommended',
+  ],
+  root: true,
+  env: {
+    node: true,
+    jest: true,
+  },
+  ignorePatterns: [
+    '.eslintrc.js',
+    'prisma.config.ts',
+    'dist/**/*',
+    'node_modules/**/*',
+  ],
+  rules: {
+    // Désactivons temporairement ces règles pour le développement
+    '@typescript-eslint/no-unsafe-assignment': 'warn',
+    '@typescript-eslint/no-unsafe-call': 'warn',
+    '@typescript-eslint/no-unsafe-member-access': 'warn',
+    '@typescript-eslint/no-unsafe-argument': 'warn',
+    '@typescript-eslint/no-unsafe-return': 'warn',
+
+    // Règles conservées
+    '@typescript-eslint/interface-name-prefix': 'off',
+    '@typescript-eslint/explicit-function-return-type': 'off',
+    '@typescript-eslint/explicit-module-boundary-types': 'off',
+    '@typescript-eslint/no-unused-vars': [
+      'error',
+      {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+      },
     ],
-    root: true,
-    env: {
-      node: true,
-      jest: true,
-    },
-    ignorePatterns: [
-      '.eslintrc.js',
-      'prisma.config.ts', // Ajoutez aussi ce fichier
-      'dist/**/*',
-      'node_modules/**/*'
-    ],
-    rules: {
-      // Règles désactivées pour Prisma
-      '@typescript-eslint/no-unsafe-assignment': 'off',
-      '@typescript-eslint/no-unsafe-call': 'off',
-      '@typescript-eslint/no-unsafe-member-access': 'off',
-      '@typescript-eslint/no-unsafe-return': 'off',
-      '@typescript-eslint/no-explicit-any': 'off',
-      
-      // Désactiver la règle des assertions inutiles
-      '@typescript-eslint/no-unnecessary-type-assertion': 'off',
-      
-      // Règles conservées
-      '@typescript-eslint/interface-name-prefix': 'off',
-      '@typescript-eslint/explicit-function-return-type': 'off',
-      '@typescript-eslint/explicit-module-boundary-types': 'off',
-      '@typescript-eslint/no-unused-vars': ['error', { 'argsIgnorePattern': '^_' }],
-    },
-  };
+    '@typescript-eslint/no-explicit-any': 'warn',
+  },
+};

@@ -6,10 +6,9 @@ import { NotificationService } from './notification.service';
 import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   imports: [
     PrismaModule,
-    // eslint-disable-next-line
+
     EventEmitterModule.forRoot({
       wildcard: false,
       delimiter: '.',

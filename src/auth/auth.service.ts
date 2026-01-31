@@ -151,7 +151,10 @@ export class AuthService {
 
   async validateUser(userId: string): Promise<Partial<User> | null> {
     const user = await this.prisma.user.findUnique({
-      where: { id: userId },
+      where: {
+        id: userId,
+        deletedAt: null,
+      },
       select: {
         id: true,
         email: true,

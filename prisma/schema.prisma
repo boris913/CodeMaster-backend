@@ -21,6 +21,7 @@ model User {
   isActive      Boolean       @default(true)
   emailVerified Boolean       @default(false)
   lastLogin     DateTime?
+  deletedAt     DateTime?
   
   // Social logins
   githubId      String?       @unique

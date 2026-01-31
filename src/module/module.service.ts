@@ -228,19 +228,15 @@ export class ModuleService {
 
     // Create update data with explicit typing
     const updateData: Prisma.ModuleUpdateInput = {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       ...(updateModuleDto.title !== undefined && {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
         title: updateModuleDto.title,
       }),
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+
       ...(updateModuleDto.description !== undefined && {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
         description: updateModuleDto.description,
       }),
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+
       ...(updateModuleDto.duration !== undefined && {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
         duration: updateModuleDto.duration,
       }),
     };

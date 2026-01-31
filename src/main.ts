@@ -3,6 +3,8 @@ import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { join } from 'path';
+import * as express from 'express';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
@@ -33,6 +35,12 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
+  // Serve static files (avatars)
+  app.use(
+    '/uploads/avatars',
+    express.static(join(__dirname, '..', 'uploads', 'avatars')),
+  );
+
   // Swagger/OpenAPI Documentation
   const config = new DocumentBuilder()
     .setTitle('CodeMaster API')
@@ -50,6 +58,14 @@ async function bootstrap(): Promise<void> {
       'access-token',
     )
     .addTag('Auth')
+    .addTag('Users') // <-- Ajouter
+    .addTag('Courses')
+    .addTag('Lessons')
+    .addTag('Modules')
+    .addTag('Exercises')
+    .addTag('Comments')
+    .addTag('Notifications')
+    .addTag('Progress')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
