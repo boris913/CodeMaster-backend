@@ -220,6 +220,7 @@ export class AuthService {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
 
+    await this.prisma.refreshToken.deleteMany({ where: { userId } });
     await this.prisma.refreshToken.create({
       data: {
         token,

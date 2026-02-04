@@ -43,6 +43,10 @@ export class RegisterDto {
   })
   password!: string;
 
+  @IsOptional()
+  @IsString()
+  confirmPassword?: string;
+
   @ApiProperty({
     description: 'First name',
     example: 'John',
