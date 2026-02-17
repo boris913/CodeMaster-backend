@@ -20,7 +20,9 @@ import {
   ApiBearerAuth,
   ApiConsumes,
   ApiBody,
+  ApiQuery,
 } from '@nestjs/swagger';
+import { Public } from '../common/decorators/public.decorator';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService, UserStats } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -236,5 +238,37 @@ export class UsersController {
   ) {
     await this.usersService.findUserById(userId, requesterId);
     return this.usersService.getUserSubmissions(userId, page, limit, status);
+  }
+
+  @Get('check-email')
+  @Public() // accessible sans authentification
+  @ApiOperation({ summary: 'Check if email is available' })
+  @ApiQuery({ name: 'email', required: true, type: String })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns availability status',
+    schema: { example: { available: true } },
+  })
+  async checkEmail(
+    @Query('email') email: string,
+  ): Promise<{ available: boolean }> {
+    const exists = await this.usersService.findByEmail(email);
+    return { available: !exists };
+  }
+
+  @Get('check-username')
+  @Public()
+  @ApiOperation({ summary: 'Check if username is available' })
+  @ApiQuery({ name: 'username', required: true, type: String })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns availability status',
+    schema: { example: { available: true } },
+  })
+  async checkUsername(
+    @Query('username') username: string,
+  ): Promise<{ available: boolean }> {
+    const exists = await this.usersService.findByUsername(username);
+    return { available: !exists };
   }
 }

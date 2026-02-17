@@ -1,26 +1,44 @@
+// src/course/course.service.ts
 import {
   Injectable,
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
 import { CourseFilterDto } from './dto/course-filter.dto';
+import { CourseAnalyticsDto } from './dto/course-analytics.dto';
 import { Role, Prisma } from '@prisma/client';
 
 @Injectable()
 export class CourseService {
+  private readonly logger = new Logger(CourseService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   async createCourse(userId: string, createCourseDto: CreateCourseDto) {
+    this.logger.log(`Creating course for user ${userId}`, {
+      userId,
+      title: createCourseDto.title,
+    });
+
     // Check that user is instructor or admin
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
 
+    if (!user) {
+      this.logger.warn(`User not found during course creation: ${userId}`);
+      throw new NotFoundException('User not found');
+    }
+
     if (user.role !== Role.INSTRUCTOR && user.role !== Role.ADMIN) {
+      this.logger.warn(
+        `User ${userId} with role ${user.role} attempted to create a course`,
+      );
       throw new ForbiddenException(
         'Only instructors and admins can create courses',
       );
@@ -28,7 +46,6 @@ export class CourseService {
 
     const { tags, ...courseData } = createCourseDto;
 
-    // Create course data with proper Prisma types
     const courseCreateData: Prisma.CourseCreateInput = {
       ...courseData,
       instructor: {
@@ -43,7 +60,7 @@ export class CourseService {
         : {}),
     };
 
-    return this.prisma.course.create({
+    const course = await this.prisma.course.create({
       data: courseCreateData,
       include: {
         tags: true,
@@ -58,9 +75,17 @@ export class CourseService {
         },
       },
     });
+
+    this.logger.log(`Course created successfully: ${course.id}`, {
+      courseId: course.id,
+      userId,
+    });
+    return course;
   }
 
   async findAllCourses(filter: CourseFilterDto) {
+    this.logger.log('Finding all courses with filters', { filter });
+
     const {
       search,
       difficulty,
@@ -152,15 +177,18 @@ export class CourseService {
       this.prisma.course.count({ where }),
     ]);
 
+    const result = courses.map((course) => ({
+      ...course,
+      totalLessons: course.modules.reduce(
+        (acc, module) => acc + module.lessons.length,
+        0,
+      ),
+      totalEnrollments: course.enrollments.length,
+    }));
+
+    this.logger.log(`Found ${total} courses`, { total, page, limit });
     return {
-      data: courses.map((course) => ({
-        ...course,
-        totalLessons: course.modules.reduce(
-          (acc, module) => acc + module.lessons.length,
-          0,
-        ),
-        totalEnrollments: course.enrollments.length,
-      })),
+      data: result,
       meta: {
         total,
         page,
@@ -171,6 +199,8 @@ export class CourseService {
   }
 
   async findCourseByIdOrSlug(identifier: string) {
+    this.logger.log(`Finding course by identifier: ${identifier}`);
+
     const course = await this.prisma.course.findFirst({
       where: {
         OR: [{ id: identifier }, { slug: identifier }],
@@ -216,10 +246,11 @@ export class CourseService {
     });
 
     if (!course) {
+      this.logger.warn(`Course not found: ${identifier}`);
       throw new NotFoundException('Course not found');
     }
 
-    return {
+    const result = {
       ...course,
       totalLessons: course.modules.reduce(
         (acc, module) => acc + module.lessons.length,
@@ -227,6 +258,9 @@ export class CourseService {
       ),
       totalStudents: course.enrollments.length,
     };
+
+    this.logger.log(`Course found: ${course.id}`, { courseId: course.id });
+    return result;
   }
 
   async updateCourse(
@@ -234,12 +268,14 @@ export class CourseService {
     courseId: string,
     updateCourseDto: UpdateCourseDto,
   ) {
-    // Check that course exists and user is instructor or admin
+    this.logger.log(`Updating course ${courseId} by user ${userId}`);
+
     const course = await this.prisma.course.findUnique({
       where: { id: courseId },
     });
 
     if (!course) {
+      this.logger.warn(`Course not found for update: ${courseId}`);
       throw new NotFoundException('Course not found');
     }
 
@@ -247,7 +283,15 @@ export class CourseService {
       where: { id: userId },
     });
 
+    if (!user) {
+      this.logger.warn(`User not found during course update: ${userId}`);
+      throw new NotFoundException('User not found');
+    }
+
     if (course.instructorId !== userId && user.role !== Role.ADMIN) {
+      this.logger.warn(
+        `User ${userId} attempted to update course ${courseId} without permission`,
+      );
       throw new ForbiddenException('You are not allowed to update this course');
     }
 
@@ -257,14 +301,11 @@ export class CourseService {
       ...updateData,
     };
 
-    // Handle tags update if provided
     if (tags) {
-      // First delete existing tags
       await this.prisma.courseTag.deleteMany({
         where: { courseId },
       });
 
-      // Then create new ones
       updateCourseData.tags = {
         create: tags.map((tag) => ({ name: tag })),
       };
@@ -287,15 +328,22 @@ export class CourseService {
       },
     });
 
+    this.logger.log(`Course ${courseId} updated successfully`, {
+      courseId,
+      userId,
+    });
     return updatedCourse;
   }
 
   async deleteCourse(userId: string, courseId: string) {
+    this.logger.log(`Deleting course ${courseId} by user ${userId}`);
+
     const course = await this.prisma.course.findUnique({
       where: { id: courseId },
     });
 
     if (!course) {
+      this.logger.warn(`Course not found for deletion: ${courseId}`);
       throw new NotFoundException('Course not found');
     }
 
@@ -303,21 +351,37 @@ export class CourseService {
       where: { id: userId },
     });
 
+    if (!user) {
+      this.logger.warn(`User not found during course deletion: ${userId}`);
+      throw new NotFoundException('User not found');
+    }
+
     if (course.instructorId !== userId && user.role !== Role.ADMIN) {
+      this.logger.warn(
+        `User ${userId} attempted to delete course ${courseId} without permission`,
+      );
       throw new ForbiddenException('You are not allowed to delete this course');
     }
 
     await this.prisma.course.delete({
       where: { id: courseId },
     });
+
+    this.logger.log(`Course ${courseId} deleted successfully`, {
+      courseId,
+      userId,
+    });
   }
 
   async publishCourse(userId: string, courseId: string) {
+    this.logger.log(`Publishing course ${courseId} by user ${userId}`);
+
     const course = await this.prisma.course.findUnique({
       where: { id: courseId },
     });
 
     if (!course) {
+      this.logger.warn(`Course not found for publish: ${courseId}`);
       throw new NotFoundException('Course not found');
     }
 
@@ -325,27 +389,41 @@ export class CourseService {
       where: { id: userId },
     });
 
+    if (!user) {
+      this.logger.warn(`User not found during publish: ${userId}`);
+      throw new NotFoundException('User not found');
+    }
+
     if (course.instructorId !== userId && user.role !== Role.ADMIN) {
+      this.logger.warn(
+        `User ${userId} attempted to publish course ${courseId} without permission`,
+      );
       throw new ForbiddenException(
         'You are not allowed to publish this course',
       );
     }
 
-    return this.prisma.course.update({
+    const updated = await this.prisma.course.update({
       where: { id: courseId },
       data: {
         isPublished: true,
         publishedAt: new Date(),
       },
     });
+
+    this.logger.log(`Course ${courseId} published`, { courseId, userId });
+    return updated;
   }
 
   async unpublishCourse(userId: string, courseId: string) {
+    this.logger.log(`Unpublishing course ${courseId} by user ${userId}`);
+
     const course = await this.prisma.course.findUnique({
       where: { id: courseId },
     });
 
     if (!course) {
+      this.logger.warn(`Course not found for unpublish: ${courseId}`);
       throw new NotFoundException('Course not found');
     }
 
@@ -353,34 +431,50 @@ export class CourseService {
       where: { id: userId },
     });
 
+    if (!user) {
+      this.logger.warn(`User not found during unpublish: ${userId}`);
+      throw new NotFoundException('User not found');
+    }
+
     if (course.instructorId !== userId && user.role !== Role.ADMIN) {
+      this.logger.warn(
+        `User ${userId} attempted to unpublish course ${courseId} without permission`,
+      );
       throw new ForbiddenException(
         'You are not allowed to unpublish this course',
       );
     }
 
-    return this.prisma.course.update({
+    const updated = await this.prisma.course.update({
       where: { id: courseId },
       data: {
         isPublished: false,
       },
     });
+
+    this.logger.log(`Course ${courseId} unpublished`, { courseId, userId });
+    return updated;
   }
 
   async enrollInCourse(userId: string, courseId: string) {
+    this.logger.log(`Enrolling user ${userId} in course ${courseId}`);
+
     const course = await this.prisma.course.findUnique({
       where: { id: courseId },
     });
 
     if (!course) {
+      this.logger.warn(`Course not found for enrollment: ${courseId}`);
       throw new NotFoundException('Course not found');
     }
 
     if (!course.isPublished) {
+      this.logger.warn(
+        `Attempted enrollment in unpublished course ${courseId}`,
+      );
       throw new BadRequestException('Course is not published');
     }
 
-    // Check if already enrolled
     const existingEnrollment = await this.prisma.enrollment.findUnique({
       where: {
         userId_courseId: {
@@ -391,10 +485,11 @@ export class CourseService {
     });
 
     if (existingEnrollment) {
+      this.logger.warn(`User ${userId} already enrolled in course ${courseId}`);
       throw new BadRequestException('Already enrolled in this course');
     }
 
-    return this.prisma.enrollment.create({
+    const enrollment = await this.prisma.enrollment.create({
       data: {
         userId,
         courseId,
@@ -414,9 +509,16 @@ export class CourseService {
         },
       },
     });
+
+    this.logger.log(`User ${userId} enrolled in course ${courseId}`, {
+      enrollmentId: enrollment.id,
+    });
+    return enrollment;
   }
 
   async unenrollFromCourse(userId: string, courseId: string) {
+    this.logger.log(`Unenrolling user ${userId} from course ${courseId}`);
+
     const enrollment = await this.prisma.enrollment.findUnique({
       where: {
         userId_courseId: {
@@ -427,6 +529,9 @@ export class CourseService {
     });
 
     if (!enrollment) {
+      this.logger.warn(
+        `Enrollment not found for user ${userId} course ${courseId}`,
+      );
       throw new NotFoundException('Enrollment not found');
     }
 
@@ -438,9 +543,13 @@ export class CourseService {
         },
       },
     });
+
+    this.logger.log(`User ${userId} unenrolled from course ${courseId}`);
   }
 
   async getUserEnrollments(userId: string) {
+    this.logger.log(`Fetching enrollments for user ${userId}`);
+
     const enrollments = await this.prisma.enrollment.findMany({
       where: { userId },
       include: {
@@ -478,7 +587,7 @@ export class CourseService {
       },
     });
 
-    return enrollments.map((enrollment) => ({
+    const result = enrollments.map((enrollment) => ({
       ...enrollment,
       course: {
         ...enrollment.course,
@@ -489,6 +598,9 @@ export class CourseService {
         totalEnrollments: enrollment.course.enrollments.length,
       },
     }));
+
+    this.logger.log(`Found ${result.length} enrollments for user ${userId}`);
+    return result;
   }
 
   async updateEnrollmentProgress(
@@ -496,6 +608,13 @@ export class CourseService {
     courseId: string,
     progress: number,
   ) {
+    this.logger.log(
+      `Updating progress for user ${userId} in course ${courseId}`,
+      {
+        progress,
+      },
+    );
+
     const enrollment = await this.prisma.enrollment.findUnique({
       where: {
         userId_courseId: {
@@ -506,13 +625,16 @@ export class CourseService {
     });
 
     if (!enrollment) {
+      this.logger.warn(
+        `Enrollment not found for progress update: user ${userId} course ${courseId}`,
+      );
       throw new NotFoundException('Enrollment not found');
     }
 
     const updatedProgress = Math.min(Math.max(progress, 0), 100);
     const completed = updatedProgress === 100;
 
-    return this.prisma.enrollment.update({
+    const updated = await this.prisma.enrollment.update({
       where: {
         userId_courseId: {
           userId,
@@ -525,29 +647,50 @@ export class CourseService {
         completedAt: completed ? new Date() : null,
       },
     });
+
+    this.logger.log(
+      `Progress updated for user ${userId} in course ${courseId}`,
+      {
+        progress: updatedProgress,
+        completed,
+      },
+    );
+    return updated;
   }
 
   async getCourseEnrollments(courseId: string, userId: string) {
+    this.logger.log(
+      `Fetching enrollments for course ${courseId} by user ${userId}`,
+    );
+
     const course = await this.prisma.course.findUnique({
       where: { id: courseId },
     });
 
     if (!course) {
+      this.logger.warn(`Course not found for enrollments: ${courseId}`);
       throw new NotFoundException('Course not found');
     }
 
-    // Check that user is instructor or admin
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
 
+    if (!user) {
+      this.logger.warn(`User not found while fetching enrollments: ${userId}`);
+      throw new NotFoundException('User not found');
+    }
+
     if (course.instructorId !== userId && user.role !== Role.ADMIN) {
+      this.logger.warn(
+        `User ${userId} attempted to view enrollments of course ${courseId} without permission`,
+      );
       throw new ForbiddenException(
         'You are not allowed to view enrollments for this course',
       );
     }
 
-    return this.prisma.enrollment.findMany({
+    const enrollments = await this.prisma.enrollment.findMany({
       where: { courseId },
       include: {
         user: {
@@ -566,5 +709,109 @@ export class CourseService {
         enrolledAt: 'desc',
       },
     });
+
+    this.logger.log(
+      `Found ${enrollments.length} enrollments for course ${courseId}`,
+    );
+    return enrollments;
+  }
+
+  async getCourseAnalytics(
+    courseId: string,
+    userId: string,
+  ): Promise<CourseAnalyticsDto> {
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
+      include: {
+        modules: {
+          include: {
+            lessons: true,
+          },
+        },
+        enrollments: true,
+      },
+    });
+
+    if (!course) {
+      throw new NotFoundException('Course not found');
+    }
+
+    // Vérification des droits
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (course.instructorId !== userId && user.role !== Role.ADMIN) {
+      throw new ForbiddenException(
+        'You are not allowed to view analytics for this course',
+      );
+    }
+
+    // Calculs
+    const totalEnrollments = course.enrollments.length;
+    const completedEnrollments = course.enrollments.filter(
+      (e) => e.completed,
+    ).length;
+    const completionRate =
+      totalEnrollments > 0
+        ? (completedEnrollments / totalEnrollments) * 100
+        : 0;
+
+    // Progressions des leçons
+    const lessonIds = course.modules.flatMap((m) => m.lessons.map((l) => l.id));
+    const progress = await this.prisma.progress.findMany({
+      where: {
+        lessonId: { in: lessonIds },
+        completed: true,
+      },
+    });
+
+    const totalTimeSpentSeconds = progress.reduce(
+      (acc, p) => acc + p.timeSpent,
+      0,
+    );
+    const totalTimeSpent = Math.round(totalTimeSpentSeconds / 60);
+
+    // Tendance des inscriptions (par jour)
+    const enrollmentTrend = course.enrollments
+      .map((e) => e.enrolledAt.toISOString().split('T')[0])
+      .reduce(
+        (acc, date) => {
+          acc[date] = (acc[date] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>,
+      );
+    const trendArray = Object.entries(enrollmentTrend)
+      .map(([period, count]) => ({ period, count }))
+      .sort((a, b) => a.period.localeCompare(b.period));
+
+    // Taux de complétion par module
+    const moduleCompletion = await Promise.all(
+      course.modules.map(async (module) => {
+        const moduleLessonIds = module.lessons.map((l) => l.id);
+        const completedCount = await this.prisma.progress.count({
+          where: {
+            lessonId: { in: moduleLessonIds },
+            completed: true,
+          },
+        });
+        const totalPossible = moduleLessonIds.length * totalEnrollments;
+        const rate =
+          totalPossible > 0 ? (completedCount / totalPossible) * 100 : 0;
+        return {
+          moduleId: module.id,
+          title: module.title,
+          completionRate: Math.round(rate),
+        };
+      }),
+    );
+
+    return {
+      totalEnrollments,
+      completedEnrollments,
+      completionRate: Math.round(completionRate),
+      averageRating: course.rating,
+      totalTimeSpent,
+      enrollmentTrend: trendArray,
+      moduleCompletion,
+    };
   }
 }

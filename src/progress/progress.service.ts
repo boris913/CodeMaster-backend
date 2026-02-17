@@ -436,4 +436,61 @@ export class ProgressService {
 
     return leaderboard.slice(0, limit);
   }
+
+  async getLessonProgress(userId: string, lessonId: string) {
+    const lesson = await this.prisma.lesson.findUnique({
+      where: { id: lessonId },
+      include: {
+        module: {
+          include: {
+            course: true,
+          },
+        },
+      },
+    });
+
+    if (!lesson) {
+      throw new NotFoundException('Lesson not found');
+    }
+
+    // Vérifier que l'utilisateur est inscrit au cours
+    const enrollment = await this.prisma.enrollment.findUnique({
+      where: {
+        userId_courseId: {
+          userId,
+          courseId: lesson.module.course.id,
+        },
+      },
+    });
+
+    if (!enrollment) {
+      throw new ForbiddenException('You are not enrolled in this course');
+    }
+
+    const progress = await this.prisma.progress.findUnique({
+      where: {
+        userId_lessonId: {
+          userId,
+          lessonId,
+        },
+      },
+      include: {
+        lesson: {
+          select: {
+            id: true,
+            title: true,
+            module: {
+              select: {
+                id: true,
+                title: true,
+                courseId: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return progress || { userId, lessonId, completed: false, timeSpent: 0 };
+  }
 }

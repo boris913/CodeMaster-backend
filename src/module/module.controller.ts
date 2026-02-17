@@ -154,4 +154,17 @@ export class ModuleController {
   ) {
     return this.moduleService.reorderModules(courseId, moduleIds, userId);
   }
+
+  @Post(':id/calculate-duration')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Recalculate module duration' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Duration calculated successfully',
+  })
+  async calculateDuration(@Param('id') id: string) {
+    return this.moduleService.calculateModuleDuration(id);
+  }
 }

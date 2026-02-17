@@ -74,6 +74,23 @@ export class ProgressController {
     return this.progressService.updateProgress(userId, lessonId, data);
   }
 
+  @Get('lesson/:lessonId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Get progress for a specific lesson' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lesson progress retrieved successfully',
+  })
+  @ApiResponse({ status: 404, description: 'Lesson not found' })
+  @ApiResponse({ status: 403, description: 'Not enrolled in course' })
+  async getLessonProgress(
+    @Param('lessonId') lessonId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.progressService.getLessonProgress(userId, lessonId);
+  }
+
   @Get('recent')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('access-token')

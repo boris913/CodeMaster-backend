@@ -1,11 +1,15 @@
 // src/types/global.d.ts
+import { User } from '@prisma/client';
+
 declare global {
   namespace Express {
+    interface Request {
+      user?: User;
+    }
     interface Multer {
       File: Multer.File;
     }
   }
 }
 
-// Cette exportation est nécessaire pour que le fichier soit considéré comme un module
 export {};

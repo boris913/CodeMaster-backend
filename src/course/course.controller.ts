@@ -21,6 +21,7 @@ import { CourseService } from './course.service';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
 import { CourseFilterDto } from './dto/course-filter.dto';
+import { CourseAnalyticsDto } from './dto/course-analytics.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -256,5 +257,22 @@ export class CourseController {
       courseId,
       progress,
     );
+  }
+
+  @Get(':id/analytics')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Get course analytics' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Analytics retrieved successfully',
+    type: CourseAnalyticsDto,
+  })
+  async getAnalytics(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+  ): Promise<CourseAnalyticsDto> {
+    return this.courseService.getCourseAnalytics(id, userId);
   }
 }

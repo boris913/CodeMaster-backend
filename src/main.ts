@@ -5,8 +5,16 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { join } from 'path';
 import * as express from 'express';
+import * as path from 'path';
+import * as fs from 'fs/promises';
+
+async function ensureUploadDir() {
+  const dir = path.join(__dirname, '..', 'uploads', 'avatars');
+  await fs.mkdir(dir, { recursive: true });
+}
 
 async function bootstrap(): Promise<void> {
+  await ensureUploadDir();
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
 

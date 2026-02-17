@@ -3,7 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
-  InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -13,7 +13,6 @@ import { UserResponseDto } from './dto/user-response.dto';
 import { Role, Prisma, User, SubmissionStatus } from '@prisma/client';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { v4 as uuidv4 } from 'uuid';
 
 export interface UserStats {
   userId: string;
@@ -37,14 +36,18 @@ interface PaginatedResponse<T> {
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   async getCurrentUser(userId: string): Promise<UserResponseDto> {
+    this.logger.log(`Fetching current user: ${userId}`);
     const user = await this.prisma.user.findUnique({
       where: { id: userId, deletedAt: null },
     });
 
     if (!user) {
+      this.logger.warn(`User not found: ${userId}`);
       throw new NotFoundException('User not found');
     }
 
@@ -56,11 +59,13 @@ export class UsersService {
     userId: string,
     updateProfileDto: UpdateProfileDto,
   ): Promise<UserResponseDto> {
+    this.logger.log(`Updating profile for user: ${userId}`);
     const user = await this.prisma.user.findUnique({
       where: { id: userId, deletedAt: null },
     });
 
     if (!user) {
+      this.logger.warn(`User not found for update: ${userId}`);
       throw new NotFoundException('User not found');
     }
 
@@ -74,6 +79,9 @@ export class UsersService {
       });
 
       if (existingUser) {
+        this.logger.warn(
+          `Username already taken: ${updateProfileDto.username}`,
+        );
         throw new BadRequestException('Username already taken');
       }
     }
@@ -83,6 +91,7 @@ export class UsersService {
       data: updateProfileDto,
     });
 
+    this.logger.log(`Profile updated for user: ${userId}`);
     const stats = await this.getUserStats(userId);
     return this.mapToUserResponseDto(updatedUser, stats);
   }
@@ -91,12 +100,18 @@ export class UsersService {
     filter: UsersFilterDto,
     requesterId: string,
   ): Promise<PaginatedResponse<UserResponseDto>> {
+    this.logger.log(
+      `Admin ${requesterId} fetching all users with filter: ${JSON.stringify(filter)}`,
+    );
     // Check if requester is admin
     const requester = await this.prisma.user.findUnique({
       where: { id: requesterId },
     });
 
     if (!requester || requester.role !== Role.ADMIN) {
+      this.logger.warn(
+        `User ${requesterId} attempted to view all users without admin role`,
+      );
       throw new ForbiddenException('Only admins can view all users');
     }
 
@@ -140,6 +155,8 @@ export class UsersService {
       this.prisma.user.count({ where }),
     ]);
 
+    this.logger.log(`Found ${users.length} users (total ${total})`);
+
     const usersWithStats = await Promise.all(
       users.map(async (user) => {
         const stats = await this.getUserStats(user.id);
@@ -162,11 +179,13 @@ export class UsersService {
     userId: string,
     requesterId: string,
   ): Promise<UserResponseDto> {
+    this.logger.log(`User ${requesterId} fetching user by id: ${userId}`);
     const user = await this.prisma.user.findUnique({
       where: { id: userId, deletedAt: null },
     });
 
     if (!user) {
+      this.logger.warn(`User not found: ${userId}`);
       throw new NotFoundException('User not found');
     }
 
@@ -176,10 +195,14 @@ export class UsersService {
     });
 
     if (!requester) {
+      this.logger.warn(`Requester not found: ${requesterId}`);
       throw new NotFoundException('Requester not found');
     }
 
     if (user.id !== requesterId && requester.role !== Role.ADMIN) {
+      this.logger.warn(
+        `User ${requesterId} attempted to view another user's profile without admin role`,
+      );
       throw new ForbiddenException('You can only view your own profile');
     }
 
@@ -192,12 +215,16 @@ export class UsersService {
     updateUserRoleDto: UpdateUserRoleDto,
     requesterId: string,
   ): Promise<UserResponseDto> {
+    this.logger.log(`Admin ${requesterId} updating role for user: ${userId}`);
     // Check if requester is admin
     const requester = await this.prisma.user.findUnique({
       where: { id: requesterId },
     });
 
     if (!requester || requester.role !== Role.ADMIN) {
+      this.logger.warn(
+        `User ${requesterId} attempted to update role without admin role`,
+      );
       throw new ForbiddenException('Only admins can update user roles');
     }
 
@@ -206,11 +233,13 @@ export class UsersService {
     });
 
     if (!user) {
+      this.logger.warn(`User not found for role update: ${userId}`);
       throw new NotFoundException('User not found');
     }
 
     // Prevent admins from modifying themselves
     if (user.id === requesterId) {
+      this.logger.warn(`Admin attempted to modify own role/status`);
       throw new BadRequestException(
         'You cannot modify your own role or status',
       );
@@ -221,6 +250,9 @@ export class UsersService {
       data: updateUserRoleDto,
     });
 
+    this.logger.log(
+      `User role updated: ${userId} -> ${JSON.stringify(updateUserRoleDto)}`,
+    );
     const stats = await this.getUserStats(userId);
     return this.mapToUserResponseDto(updatedUser, stats);
   }
@@ -229,74 +261,67 @@ export class UsersService {
     userId: string,
     file: Express.Multer.File,
   ): Promise<UserResponseDto> {
+    this.logger.log(`Uploading avatar for user: ${userId}`);
     const user = await this.prisma.user.findUnique({
       where: { id: userId, deletedAt: null },
     });
 
     if (!user) {
+      this.logger.warn(`User not found for avatar upload: ${userId}`);
       throw new NotFoundException('User not found');
     }
 
-    // Validate file
+    // Validation supplémentaire (redondante mais sécuritaire)
     if (!file.mimetype.startsWith('image/')) {
+      this.logger.warn(`Invalid file type for avatar: ${file.mimetype}`);
       throw new BadRequestException('File must be an image');
     }
-
     if (file.size > 5 * 1024 * 1024) {
-      // 5MB
+      this.logger.warn(`File too large for avatar: ${file.size} bytes`);
       throw new BadRequestException('File size must be less than 5MB');
     }
 
-    // Generate unique filename
-    const fileExtension = path.extname(file.originalname);
-    const fileName = `${uuidv4()}${fileExtension}`;
-    const uploadPath = path.join('uploads', 'avatars', fileName);
-
-    try {
-      // Ensure upload directory exists
-      await fs.mkdir(path.dirname(uploadPath), { recursive: true });
-
-      // Save file
-      await fs.writeFile(uploadPath, file.buffer);
-
-      // Delete old avatar if exists
-      if (user.avatar) {
-        const oldAvatarPath = path.join(
-          'uploads',
-          'avatars',
-          path.basename(user.avatar),
-        );
-        try {
-          await fs.unlink(oldAvatarPath);
-        } catch {
-          // Ignore if file doesn't exist
-        }
+    // Supprimer l'ancien avatar si existant
+    if (user.avatar) {
+      const oldAvatarPath = path.join(
+        'uploads',
+        'avatars',
+        path.basename(user.avatar),
+      );
+      try {
+        await fs.unlink(oldAvatarPath);
+        this.logger.debug(`Old avatar deleted: ${oldAvatarPath}`);
+      } catch {
+        // Ignorer si le fichier n'existe pas
       }
-
-      // Update user with new avatar URL
-      const avatarUrl = `/uploads/avatars/${fileName}`;
-      const updatedUser = await this.prisma.user.update({
-        where: { id: userId },
-        data: { avatar: avatarUrl },
-      });
-
-      const stats = await this.getUserStats(userId);
-      return this.mapToUserResponseDto(updatedUser, stats);
-    } catch {
-      throw new InternalServerErrorException('Failed to upload avatar');
     }
+
+    // URL publique basée sur le nom généré par Multer
+    const avatarUrl = `/uploads/avatars/${file.filename}`;
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: { avatar: avatarUrl },
+    });
+
+    this.logger.log(`Avatar uploaded successfully for user: ${userId}`);
+    const stats = await this.getUserStats(userId);
+    return this.mapToUserResponseDto(updatedUser, stats);
   }
 
   async deleteAvatar(userId: string): Promise<UserResponseDto> {
+    this.logger.log(`Deleting avatar for user: ${userId}`);
     const user = await this.prisma.user.findUnique({
       where: { id: userId, deletedAt: null },
     });
 
     if (!user) {
+      this.logger.warn(`User not found for avatar deletion: ${userId}`);
       throw new NotFoundException('User not found');
     }
 
     if (!user.avatar) {
+      this.logger.warn(`User ${userId} has no avatar to delete`);
       throw new BadRequestException('User does not have an avatar');
     }
 
@@ -308,7 +333,9 @@ export class UsersService {
     );
     try {
       await fs.unlink(avatarPath);
+      this.logger.debug(`Avatar file deleted: ${avatarPath}`);
     } catch {
+      this.logger.warn(`Failed to delete avatar file`);
       // Ignore if file doesn't exist
     }
 
@@ -318,17 +345,22 @@ export class UsersService {
       data: { avatar: null },
     });
 
+    this.logger.log(`Avatar deleted for user: ${userId}`);
     const stats = await this.getUserStats(userId);
     return this.mapToUserResponseDto(updatedUser, stats);
   }
 
   async softDeleteUser(userId: string, requesterId: string): Promise<void> {
+    this.logger.log(`Admin ${requesterId} soft deleting user: ${userId}`);
     // Check if requester is admin
     const requester = await this.prisma.user.findUnique({
       where: { id: requesterId },
     });
 
     if (!requester || requester.role !== Role.ADMIN) {
+      this.logger.warn(
+        `User ${requesterId} attempted to delete user without admin role`,
+      );
       throw new ForbiddenException('Only admins can delete users');
     }
 
@@ -337,11 +369,13 @@ export class UsersService {
     });
 
     if (!user) {
+      this.logger.warn(`User not found for deletion: ${userId}`);
       throw new NotFoundException('User not found');
     }
 
     // Prevent admins from deleting themselves
     if (user.id === requesterId) {
+      this.logger.warn(`Admin attempted to delete own account`);
       throw new BadRequestException('You cannot delete your own account');
     }
 
@@ -361,9 +395,11 @@ export class UsersService {
       where: { userId },
       data: { revoked: true },
     });
+    this.logger.log(`User soft deleted: ${userId}`);
   }
 
   async getUserStats(userId: string): Promise<UserStats> {
+    this.logger.debug(`Computing stats for user: ${userId}`);
     const [enrollments, submissions, progress] = await Promise.all([
       this.prisma.enrollment.findMany({
         where: { userId },
@@ -409,6 +445,9 @@ export class UsersService {
   }
 
   async getUserEnrollments(userId: string, page: number, limit: number) {
+    this.logger.debug(
+      `Fetching enrollments for user: ${userId} - page ${page}, limit ${limit}`,
+    );
     const enrollments = await this.prisma.enrollment.findMany({
       where: { userId },
       include: {
@@ -453,6 +492,9 @@ export class UsersService {
     limit: number,
     status?: SubmissionStatus,
   ) {
+    this.logger.debug(
+      `Fetching submissions for user: ${userId} - page ${page}, limit ${limit}, status ${status}`,
+    );
     const where: Prisma.SubmissionWhereInput = { userId };
     if (status) {
       where.status = status;
@@ -523,5 +565,17 @@ export class UsersService {
     }
 
     return dto;
+  }
+
+  async findByEmail(email: string): Promise<User | null> {
+    return this.prisma.user.findUnique({
+      where: { email, deletedAt: null },
+    });
+  }
+
+  async findByUsername(username: string): Promise<User | null> {
+    return this.prisma.user.findUnique({
+      where: { username, deletedAt: null },
+    });
   }
 }
