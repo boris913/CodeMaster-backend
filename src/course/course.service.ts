@@ -12,6 +12,8 @@ import { UpdateCourseDto } from './dto/update-course.dto';
 import { CourseFilterDto } from './dto/course-filter.dto';
 import { CourseAnalyticsDto } from './dto/course-analytics.dto';
 import { Role, Prisma } from '@prisma/client';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 
 @Injectable()
 export class CourseService {
@@ -813,5 +815,64 @@ export class CourseService {
       enrollmentTrend: trendArray,
       moduleCompletion,
     };
+  }
+
+  async updateThumbnail(
+    courseId: string,
+    file: Express.Multer.File,
+    userId: string,
+  ) {
+    // Vérifier que le cours existe
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
+    });
+
+    if (!course) {
+      throw new NotFoundException('Course not found');
+    }
+
+    // Vérifier les permissions
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (course.instructorId !== userId && user.role !== Role.ADMIN) {
+      throw new ForbiddenException('You are not allowed to update this course');
+    }
+
+    // Supprimer l'ancienne miniature si elle existe
+    if (course.thumbnail) {
+      const oldFilePath = path.join(
+        'uploads',
+        'courses',
+        path.basename(course.thumbnail),
+      );
+      try {
+        await fs.unlink(oldFilePath);
+      } catch {
+        // Ignorer si le fichier n'existe pas
+      }
+    }
+
+    // Construire l'URL publique
+    const thumbnailUrl = `/uploads/courses/${file.filename}`;
+
+    // Mettre à jour le cours
+    const updatedCourse = await this.prisma.course.update({
+      where: { id: courseId },
+      data: { thumbnail: thumbnailUrl },
+      include: {
+        instructor: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            avatar: true,
+          },
+        },
+        tags: true,
+      },
+    });
+
+    this.logger.log(`Thumbnail updated for course ${courseId}`);
+    return updatedCourse;
   }
 }

@@ -49,6 +49,11 @@ async function bootstrap(): Promise<void> {
     express.static(join(__dirname, '..', 'uploads', 'avatars')),
   );
 
+  app.use(
+    '/uploads/courses',
+    express.static(join(__dirname, '..', 'uploads', 'courses')),
+  );
+
   // Swagger/OpenAPI Documentation
   const config = new DocumentBuilder()
     .setTitle('CodeMaster API')

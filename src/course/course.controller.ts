@@ -10,13 +10,19 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
+  ApiConsumes,
+  ApiBody,
 } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { Express } from 'express';
 import { CourseService } from './course.service';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
@@ -274,5 +280,32 @@ export class CourseController {
     @CurrentUser('id') userId: string,
   ): Promise<CourseAnalyticsDto> {
     return this.courseService.getCourseAnalytics(id, userId);
+  }
+
+  @Patch(':id/thumbnail')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiBearerAuth('access-token')
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @ApiOperation({ summary: 'Upload course thumbnail' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Thumbnail uploaded successfully',
+  })
+  async uploadThumbnail(
+    @Param('id') courseId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.courseService.updateThumbnail(courseId, file, userId);
   }
 }
