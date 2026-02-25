@@ -46,3 +46,17 @@ export interface LeaderboardEntry {
   enrolledAt: Date;
   lastActivity: Date;
 }
+
+export interface GlobalLeaderboardEntry {
+  rank: number;
+  userId: string;
+  username: string;
+  avatar: string | null;
+  completedLessons: number;
+  totalLessons?: number; // optionnel car on ne l'utilise pas dans le global
+  progress?: number; // idem
+  streak: number;
+  points: number;
+  lastActivity: Date;
+  updatedAt: Date; // pour le tri
+}

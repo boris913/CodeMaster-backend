@@ -7,8 +7,10 @@ import {
   ModuleProgress,
   CourseProgressResponse,
   LeaderboardEntry,
+  GlobalLeaderboardEntry,
 } from './types/progress.types';
 import { PrismaService } from '../prisma/prisma.service';
+import { AdminRecentActivityDto } from './dto/admin-recent-activity.dto';
 import { Prisma, Progress } from '@prisma/client';
 
 @Injectable()
@@ -492,5 +494,177 @@ export class ProgressService {
     });
 
     return progress || { userId, lessonId, completed: false, timeSpent: 0 };
+  }
+
+  async getGlobalLeaderboard(
+    period?: 'weekly' | 'monthly' | 'all',
+    limit: number = 100,
+  ): Promise<GlobalLeaderboardEntry[]> {
+    // Définir la plage de dates en fonction de la période
+    let dateFilter: Date | undefined;
+    const now = new Date();
+    if (period === 'weekly') {
+      dateFilter = new Date(now.setDate(now.getDate() - 7));
+    } else if (period === 'monthly') {
+      dateFilter = new Date(now.setMonth(now.getMonth() - 1));
+    }
+
+    // Récupérer toutes les progressions (ou seulement celles de la période)
+    const whereClause: Prisma.ProgressWhereInput = {};
+    if (dateFilter) {
+      whereClause.updatedAt = { gte: dateFilter };
+    }
+
+    // On utilise findMany pour obtenir les progressions avec les utilisateurs
+    const progresses = await this.prisma.progress.findMany({
+      where: whereClause,
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            avatar: true,
+          },
+        },
+      },
+      orderBy: {
+        updatedAt: 'desc',
+      },
+    });
+
+    // Agréger par utilisateur
+    const userMap = new Map<
+      string,
+      {
+        userId: string;
+        username: string;
+        avatar: string | null;
+        completedLessons: number;
+        streak: number;
+        points: number;
+        lastActivity: Date;
+        updatedAt: Date;
+      }
+    >();
+
+    for (const prog of progresses) {
+      if (!prog.user) continue;
+      const userId = prog.userId;
+      let entry = userMap.get(userId);
+      if (!entry) {
+        entry = {
+          userId,
+          username: prog.user.username,
+          avatar: prog.user.avatar,
+          completedLessons: 0,
+          streak: 0,
+          points: 0,
+          lastActivity: prog.updatedAt,
+          updatedAt: prog.updatedAt,
+        };
+        userMap.set(userId, entry);
+      }
+      // maintenant entry est défini
+      if (prog.completed) {
+        entry.completedLessons += 1;
+        entry.points += 10;
+      }
+      if (prog.updatedAt > entry.lastActivity) {
+        entry.lastActivity = prog.updatedAt;
+      }
+    }
+
+    // Convertir la map en tableau et trier
+    let leaderboard = Array.from(userMap.values()).map((entry) => ({
+      ...entry,
+      rank: 0, // provisoire
+    }));
+
+    // Trier par points décroissants, puis par dernière activité
+    leaderboard.sort((a, b) => {
+      if (b.points !== a.points) return b.points - a.points;
+      return b.lastActivity.getTime() - a.lastActivity.getTime();
+    });
+
+    // Assigner les rangs
+    leaderboard = leaderboard.map((entry, idx) => ({
+      ...entry,
+      rank: idx + 1,
+    }));
+
+    // Limiter
+    return leaderboard.slice(0, limit);
+  }
+
+  // src/progress/progress.service.ts
+  async getAdminRecentActivities(
+    limit: number = 20,
+  ): Promise<AdminRecentActivityDto[]> {
+    // Récupérer les dernières leçons complétées
+    const completedLessons = await this.prisma.progress.findMany({
+      where: { completed: true },
+      orderBy: { updatedAt: 'desc' },
+      take: limit,
+      include: {
+        user: { select: { id: true, username: true, avatar: true } },
+        lesson: { select: { title: true } },
+      },
+    });
+
+    // Récupérer les dernières inscriptions
+    const enrollments = await this.prisma.enrollment.findMany({
+      orderBy: { enrolledAt: 'desc' },
+      take: limit,
+      include: {
+        user: { select: { id: true, username: true, avatar: true } },
+        course: { select: { title: true } },
+      },
+    });
+
+    // Récupérer les dernières soumissions
+    const submissions = await this.prisma.submission.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      include: {
+        user: { select: { id: true, username: true, avatar: true } },
+        exercise: { select: { title: true } },
+      },
+    });
+
+    // Fusionner et trier par date
+    const activities: AdminRecentActivityDto[] = [
+      ...completedLessons.map((p) => ({
+        id: p.id,
+        userId: p.user.id,
+        username: p.user.username,
+        userAvatar: p.user.avatar || undefined,
+        type: 'lesson_completed' as const,
+        description: `a terminé la leçon "${p.lesson.title}"`,
+        createdAt: p.updatedAt,
+      })),
+      ...enrollments.map((e) => ({
+        id: e.id,
+        userId: e.user.id,
+        username: e.user.username,
+        userAvatar: e.user.avatar || undefined,
+        type: 'course_enrolled' as const,
+        description: `s'est inscrit au cours "${e.course.title}"`,
+        createdAt: e.enrolledAt,
+      })),
+      ...submissions.map((s) => ({
+        id: s.id,
+        userId: s.user.id,
+        username: s.user.username,
+        userAvatar: s.user.avatar || undefined,
+        type: 'exercise_submitted' as const,
+        description: `a soumis l'exercice "${s.exercise.title}"`,
+        createdAt: s.createdAt,
+      })),
+    ];
+
+    // Trier par date décroissante et limiter
+    return activities
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(0, limit);
   }
 }

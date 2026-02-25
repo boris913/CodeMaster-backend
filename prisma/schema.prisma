@@ -39,6 +39,7 @@ model User {
   comments      Comment[]
   notifications Notification[]
   refreshTokens RefreshToken[]
+  favorites     UserFavorite[]
   
   @@map("users")
 }
@@ -86,6 +87,7 @@ model Course {
   modules       Module[]
   tags          CourseTag[]
   enrollments   Enrollment[]
+  favorites     UserFavorite[]
   
   @@map("courses")
 }
@@ -238,6 +240,19 @@ model Progress {
   
   @@unique([userId, lessonId])
   @@map("progress")
+}
+
+model UserFavorite {
+  id        String   @id @default(cuid())
+  userId    String
+  courseId  String
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+  @@map("user_favorites")
 }
 
 model Comment {

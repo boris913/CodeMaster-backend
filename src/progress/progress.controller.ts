@@ -12,19 +12,40 @@ import {
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { ProgressService } from './progress.service';
 import {
   CourseProgressResponse,
   LeaderboardEntry,
+  GlobalLeaderboardEntry,
 } from './types/progress.types';
+import { AdminRecentActivityDto } from './dto/admin-recent-activity.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { Role } from '@prisma/client';
 
 @ApiTags('Progress')
 @Controller('progress')
 export class ProgressController {
   constructor(private readonly progressService: ProgressService) {}
+
+  @Get('leaderboard/global')
+  @ApiOperation({ summary: 'Get global leaderboard' })
+  @ApiQuery({
+    name: 'period',
+    required: false,
+    enum: ['weekly', 'monthly', 'all'],
+  })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  async getGlobalLeaderboard(
+    @Query('period') period?: 'weekly' | 'monthly' | 'all',
+    @Query('limit') limit?: number,
+  ): Promise<GlobalLeaderboardEntry[]> {
+    return this.progressService.getGlobalLeaderboard(period, limit);
+  }
 
   @Get()
   @UseGuards(JwtAuthGuard)
@@ -119,5 +140,15 @@ export class ProgressController {
     @Query('limit') limit?: number,
   ): Promise<LeaderboardEntry[]> {
     return this.progressService.getLeaderboard(courseId, limit);
+  }
+
+  @Get('admin/recent-activities')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Get recent activities of all users (admin only)' })
+  async getAdminRecentActivities(
+    @Query('limit') limit?: number,
+  ): Promise<AdminRecentActivityDto[]> {
+    return this.progressService.getAdminRecentActivities(limit);
   }
 }

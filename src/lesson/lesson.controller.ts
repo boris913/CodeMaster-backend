@@ -174,8 +174,12 @@ export class LessonController {
     status: HttpStatus.FORBIDDEN,
     description: 'Not enrolled in course',
   })
-  markAsCompleted(@Param('id') id: string, @CurrentUser('id') userId: string) {
-    return this.lessonService.markAsCompleted(id, userId);
+  async markAsCompleted(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+    @Body('timeSpent') timeSpent?: number,
+  ) {
+    return this.lessonService.markAsCompleted(id, userId, timeSpent);
   }
 
   @Post('lessons/:id/position')

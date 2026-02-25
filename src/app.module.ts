@@ -14,6 +14,8 @@ import { ExercisesModule } from './exercise/exercise.module';
 import { CommentModule } from './comment/comment.module';
 import { NotificationModule } from './notification/notification.module';
 import { UserModule } from './user/user.module';
+import { AdminModule } from './admin/admin.module';
+import { FavoriteModule } from './favorite/favorite.module';
 import jwtConfig from './config/jwt.config';
 
 @Module({
@@ -33,6 +35,8 @@ import jwtConfig from './config/jwt.config';
     CommentModule,
     NotificationModule,
     UserModule,
+    AdminModule,
+    FavoriteModule,
   ],
   providers: [
     {

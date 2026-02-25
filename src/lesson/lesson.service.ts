@@ -7,11 +7,15 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateLessonDto } from './dto/create-lesson.dto';
 import { UpdateLessonDto } from './dto/update-lesson.dto';
+import { CourseService } from '../course/course.service';
 import { Prisma, Role, VideoType } from '@prisma/client';
 
 @Injectable()
 export class LessonService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly courseService: CourseService,
+  ) {}
 
   async createLesson(
     moduleId: string,
@@ -484,7 +488,7 @@ export class LessonService {
     return this.findAllLessons(moduleId, userId);
   }
 
-  async markAsCompleted(lessonId: string, userId: string) {
+  async markAsCompleted(lessonId: string, userId: string, timeSpent?: number) {
     const lesson = await this.prisma.lesson.findUnique({
       where: { id: lessonId },
       include: {
@@ -500,7 +504,7 @@ export class LessonService {
       throw new NotFoundException('Lesson not found');
     }
 
-    // Check if user is enrolled in the course
+    // Vérifier si l'utilisateur est inscrit au cours
     const enrollment = await this.prisma.enrollment.findUnique({
       where: {
         userId_courseId: {
@@ -514,52 +518,25 @@ export class LessonService {
       throw new ForbiddenException('You are not enrolled in this course');
     }
 
-    // Check if progress already exists
-    const existingProgress = await this.prisma.progress.findUnique({
+    // Si timeSpent n'est pas fourni, utiliser la durée de la leçon (en minutes converties en secondes)
+    const timeSpentToAdd = timeSpent ?? lesson.duration * 60;
+
+    // Mettre à jour ou créer la progression de la leçon avec upsert
+    const progress = await this.prisma.progress.upsert({
       where: {
-        userId_lessonId: {
-          userId,
-          lessonId,
-        },
+        userId_lessonId: { userId, lessonId },
       },
-    });
-
-    if (existingProgress) {
-      return this.prisma.progress.update({
-        where: {
-          userId_lessonId: {
-            userId,
-            lessonId,
-          },
-        },
-        data: {
-          completed: true,
-          completedAt: new Date(),
-        },
-        include: {
-          lesson: {
-            select: {
-              id: true,
-              title: true,
-              module: {
-                select: {
-                  id: true,
-                  title: true,
-                  courseId: true,
-                },
-              },
-            },
-          },
-        },
-      });
-    }
-
-    return this.prisma.progress.create({
-      data: {
+      update: {
+        completed: true,
+        completedAt: new Date(),
+        timeSpent: { increment: timeSpentToAdd },
+      },
+      create: {
         userId,
         lessonId,
         completed: true,
         completedAt: new Date(),
+        timeSpent: timeSpentToAdd,
       },
       include: {
         lesson: {
@@ -577,6 +554,14 @@ export class LessonService {
         },
       },
     });
+
+    // Recalculer la progression globale du cours
+    await this.courseService.updateCourseProgress(
+      userId,
+      lesson.module.course.id,
+    );
+
+    return progress;
   }
 
   async updateVideoPosition(

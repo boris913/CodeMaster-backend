@@ -875,4 +875,37 @@ export class CourseService {
     this.logger.log(`Thumbnail updated for course ${courseId}`);
     return updatedCourse;
   }
+
+  async updateCourseProgress(userId: string, courseId: string): Promise<void> {
+    // Récupérer toutes les leçons du cours
+    const lessons = await this.prisma.lesson.findMany({
+      where: { module: { courseId } },
+      select: { id: true },
+    });
+    const totalLessons = lessons.length;
+
+    // Compter les leçons complétées par l'utilisateur
+    const completedLessons = await this.prisma.progress.count({
+      where: {
+        userId,
+        lessonId: { in: lessons.map((l) => l.id) },
+        completed: true,
+      },
+    });
+
+    const progress =
+      totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0;
+
+    // Mettre à jour l'enrollment
+    await this.prisma.enrollment.update({
+      where: {
+        userId_courseId: { userId, courseId },
+      },
+      data: {
+        progress,
+        completed: progress === 100,
+        completedAt: progress === 100 ? new Date() : null,
+      },
+    });
+  }
 }
