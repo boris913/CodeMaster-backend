@@ -7,6 +7,7 @@ import { join } from 'path';
 import * as express from 'express';
 import * as path from 'path';
 import * as fs from 'fs/promises';
+import cookieParser from 'cookie-parser';
 
 async function ensureUploadDir() {
   const dir = path.join(__dirname, '..', 'uploads', 'avatars');
@@ -42,6 +43,8 @@ async function bootstrap(): Promise<void> {
       },
     }),
   );
+
+  app.use(cookieParser());
 
   // Serve static files (avatars)
   app.use(

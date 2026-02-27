@@ -8,6 +8,8 @@ import {
   Get,
   BadRequestException,
   Res,
+  Req,
+  UnauthorizedException, // ✅ Ajout de l'import manquant
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -25,11 +27,14 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
-import { RefreshTokenDto } from './dto/refresh-token.dto';
-import { LogoutDto } from './dto/logout.dto';
 import { User } from '@prisma/client';
 import { Throttle } from '@nestjs/throttler';
-import { Response } from 'express';
+import { Response, Request } from 'express'; // ✅ Import du type Request depuis express
+
+// Interface étendant Request pour inclure les cookies
+interface RequestWithCookies extends Request {
+  cookies: Record<string, string>;
+}
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -95,7 +100,11 @@ export class AuthController {
       path: '/api/v1/auth/refresh',
     });
 
-    return { accessToken: tokens.accessToken };
+    return {
+      accessToken: tokens.accessToken,
+      tokenType: tokens.tokenType,
+      expiresIn: tokens.expiresIn,
+    };
   }
 
   @Post('logout')
@@ -116,9 +125,23 @@ export class AuthController {
   })
   async logout(
     @CurrentUser('id') userId: string,
-    @Body() logoutDto: LogoutDto,
+    @Req() req: RequestWithCookies,
+    @Res({ passthrough: true }) res: Response,
   ): Promise<void> {
-    return this.authService.logout(userId, logoutDto.refreshToken);
+    // ✅ Lire le refreshToken depuis le cookie (plus depuis le body)
+    const refreshToken: string | undefined = req.cookies['refreshToken'];
+
+    if (refreshToken) {
+      await this.authService.logout(userId, refreshToken);
+    }
+
+    // ✅ Supprimer le cookie côté serveur
+    res.clearCookie('refreshToken', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/api/v1/auth/refresh',
+    });
   }
 
   @Public()
@@ -138,9 +161,32 @@ export class AuthController {
     description: 'Invalid or expired refresh token',
   })
   async refreshTokens(
-    @Body() refreshTokenDto: RefreshTokenDto,
-  ): Promise<TokensDto> {
-    return this.authService.refreshTokens(refreshTokenDto.refreshToken);
+    @Req() req: RequestWithCookies,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<{ accessToken: string; expiresIn: number }> {
+    // ✅ Typage explicite — plus d'erreur ESLint no-unsafe-assignment
+    const refreshToken: string | undefined = req.cookies['refreshToken'];
+
+    if (!refreshToken) {
+      throw new UnauthorizedException('No refresh token provided');
+    }
+
+    const tokens = await this.authService.refreshTokens(refreshToken);
+
+    // ✅ Réémettre le nouveau refreshToken en cookie httpOnly (rotation)
+    res.cookie('refreshToken', tokens.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/api/v1/auth/refresh',
+    });
+
+    // ✅ Retourner uniquement l'accessToken
+    return {
+      accessToken: tokens.accessToken,
+      expiresIn: tokens.expiresIn,
+    };
   }
 
   @Public()
@@ -178,7 +224,6 @@ export class AuthController {
   async resetPassword(
     @Body() resetPasswordDto: ResetPasswordDto,
   ): Promise<void> {
-    // Validate that passwords match
     if (resetPasswordDto.newPassword !== resetPasswordDto.confirmPassword) {
       throw new BadRequestException('Passwords do not match');
     }
