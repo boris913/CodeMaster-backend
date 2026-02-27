@@ -4,6 +4,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { NotificationController } from './notification.controller';
 import { NotificationService } from './notification.service';
 import { PrismaModule } from '../prisma/prisma.module';
+import { NotificationListener } from './listeners/notification.listener';
 
 @Module({
   imports: [
@@ -20,7 +21,7 @@ import { PrismaModule } from '../prisma/prisma.module';
     }),
   ],
   controllers: [NotificationController],
-  providers: [NotificationService],
+  providers: [NotificationService, NotificationListener],
   exports: [NotificationService],
 })
 export class NotificationModule {}

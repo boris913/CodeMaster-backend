@@ -6,6 +6,8 @@ import {
   HttpStatus,
   UseGuards,
   Get,
+  BadRequestException,
+  Res,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -26,6 +28,8 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { LogoutDto } from './dto/logout.dto';
 import { User } from '@prisma/client';
+import { Throttle } from '@nestjs/throttler';
+import { Response } from 'express';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -57,6 +61,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -76,8 +81,21 @@ export class AuthController {
     status: HttpStatus.FORBIDDEN,
     description: 'Account is deactivated',
   })
-  async login(@Body() loginDto: LoginDto): Promise<TokensDto> {
-    return this.authService.login(loginDto);
+  async login(
+    @Body() dto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const tokens = await this.authService.login(dto);
+
+    res.cookie('refreshToken', tokens.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/api/v1/auth/refresh',
+    });
+
+    return { accessToken: tokens.accessToken };
   }
 
   @Post('logout')
@@ -162,7 +180,7 @@ export class AuthController {
   ): Promise<void> {
     // Validate that passwords match
     if (resetPasswordDto.newPassword !== resetPasswordDto.confirmPassword) {
-      throw new Error('Passwords do not match');
+      throw new BadRequestException('Passwords do not match');
     }
 
     return this.authService.resetPassword(

@@ -259,16 +259,18 @@ export class AuthService {
 
   private async saveRefreshToken(userId: string, token: string): Promise<void> {
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
+    expiresAt.setDate(expiresAt.getDate() + 7);
 
-    await this.prisma.refreshToken.deleteMany({ where: { userId } });
-    await this.prisma.refreshToken.create({
-      data: {
-        token,
-        userId,
-        expiresAt,
-      },
-    });
+    // Atomique + conserve les autres sessions
+    await this.prisma.$transaction([
+      this.prisma.refreshToken.updateMany({
+        where: { userId, revoked: false },
+        data: { revoked: true },
+      }),
+      this.prisma.refreshToken.create({
+        data: { token, userId, expiresAt },
+      }),
+    ]);
     this.logger.debug(`Refresh token saved for user: ${userId}`);
   }
 

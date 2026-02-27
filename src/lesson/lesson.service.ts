@@ -162,6 +162,8 @@ export class LessonService {
         where: { id: userId },
       });
 
+      if (!user) throw new NotFoundException('User not found');
+
       if (
         module.course.instructorId !== userId &&
         user.role !== Role.ADMIN &&
